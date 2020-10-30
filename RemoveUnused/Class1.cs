@@ -1,12 +1,11 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Collections.Immutable;
 using System.Linq;
-using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
 using NUnit.Framework;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.FindSymbols;
+using Microsoft.CodeAnalysis.Text;
 
 namespace RemoveUnused
 {
@@ -14,38 +13,35 @@ namespace RemoveUnused
     public class Class1
     {
         [Test]
-        public async Task Foo()
+        public void Foo()
         {
-            var tree = CSharpSyntaxTree.ParseText(
-@"public class MyClass{public void Consumer(){Consumed();}public void Consumed(){}}");
+            var cs = @"public class MyClass{public void Consumer(){Consumed();}public void Consumed(){}}";
+            //                                          33 -- 41   44 -- 52                68 -- 76
             var mscorlib = MetadataReference.CreateFromFile(typeof(object).Assembly.Location);
-            var compilation = CSharpCompilation.Create("MyCompilation",
-                syntaxTrees: new[] { tree }, references: new[] { mscorlib });
-            //Note that we must specify the tree for which we want the model.
-            //Each tree has its own semantic model
-            var model = compilation.GetSemanticModel(tree);
-
-            var descendantNodes = (await tree.GetRootAsync()).DescendantNodes().ToArray();
-            foreach (var node in descendantNodes)
+            var ws = new AdhocWorkspace();
+            //Create new project
+            var project = ws.AddProject("Sample", "C#");
+            project = project.AddMetadataReference(mscorlib);
+            //Add project to workspace
+            ws.TryApplyChanges(project.Solution);
+            var sourceText = SourceText.From(cs);
+            //Create new document
+            var doc = ws.AddDocument(project.Id, "NewDoc", sourceText);
+            //Get the semantic model
+            var model = doc.GetSemanticModelAsync().Result;
+            //Get the syntax nodes for all method invocations
+            var methodInvocations = doc.GetSyntaxRootAsync().Result.DescendantNodes().OfType<InvocationExpressionSyntax>();
+            var methodSymbols = methodInvocations.Select(x => model.GetSymbolInfo(x).Symbol);
+            //Finds all references to each method
+            var references = methodSymbols.Select(async m => new
             {
-                Console.WriteLine($"{(node.GetText() + "            ").Substring(0,10)}\t{node.GetType().Name}");
-            }
+                Referenced = m.Locations,
+                Referencing = (await SymbolFinder.FindReferencesAsync(m, doc.Project.Solution)).SelectMany(x => x.Locations).Select(x => x.Location)
+            });
 
-            Console.WriteLine();
-
-            var unusedMethods = descendantNodes.OfType<MethodDeclarationSyntax>().ToList();
-
-            foreach (var method in unusedMethods)
+            foreach (var reference in references.Select(x => x.Result))
             {
-                Console.WriteLine(model.GetSymbolInfo(method).Symbol);
-            }
-
-            var calls = descendantNodes.OfType<InvocationExpressionSyntax>();
-
-            foreach (var call in calls)
-            {
-                var callee = model.GetSymbolInfo(call).Symbol;
-                Console.WriteLine($"{call}: {callee}");
+                Console.WriteLine($"{reference.Referenced.First()} --> {reference.Referencing.First()}");
             }
         }
     }
