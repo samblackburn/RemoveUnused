@@ -1,12 +1,14 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
 using NUnit.Framework;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.FindSymbols;
+using Microsoft.CodeAnalysis.MSBuild;
 using Microsoft.CodeAnalysis.Text;
 
 namespace RemoveUnused
@@ -82,6 +84,31 @@ namespace RemoveUnused
             foreach (var reference in references)
             {
                 Console.WriteLine($"{reference.Referenced.First()} --> {reference.Referencing.First()}");
+            }
+        }
+
+        [Test]
+        public async Task RealSolution()
+        {
+            var sln = @"E:\repos\SQLCompareEngine\SQLCompare.sln";
+
+            MSBuildWorkspace ws;
+            try
+            {
+                ws = MSBuildWorkspace.Create();
+            }
+            catch (ReflectionTypeLoadException ex)
+            {
+                throw ex.LoaderExceptions.First();
+            }
+
+            var solution = await ws.OpenSolutionAsync(sln);
+            foreach (var project in solution.Projects)
+            {
+                foreach (var document in project.Documents)
+                {
+                    Console.WriteLine(project.Name + "\t\t\t" + document.Name);
+                }
             }
         }
 
