@@ -4,12 +4,11 @@ using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
-using NUnit.Framework;
-using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.FindSymbols;
 using Microsoft.CodeAnalysis.MSBuild;
 using Microsoft.CodeAnalysis.Text;
+using NUnit.Framework;
 
 namespace RemoveUnused
 {
@@ -110,6 +109,41 @@ namespace RemoveUnused
                     Console.WriteLine(project.Name + "\t\t\t" + document.Name);
                 }
             }
+        }
+
+        [Test]
+        public async Task RealSolution2()
+        {
+            var sln = @"E:\repos\SQLCompareEngine\SQLCompare.sln";
+
+            var msWorkspace = MSBuildWorkspace.Create();
+            var solution = await msWorkspace.OpenSolutionAsync(sln);
+
+            foreach (var projectId in solution.ProjectIds)
+            {
+                var project = solution.GetProject(projectId);
+                foreach (var documentId in project.DocumentIds)
+                {
+                    var document = project.GetDocument(documentId);
+
+                    if (document.SourceCodeKind != SourceCodeKind.Regular)
+                        continue;
+
+                    var doc = document;
+                    doc = await Rewrite(doc);
+
+                    project = doc.Project;
+                }
+
+                solution = project.Solution;
+            }
+
+            msWorkspace.TryApplyChanges(solution);
+        }
+
+        private async Task<Document> Rewrite(Document doc)
+        {
+            throw new System.NotImplementedException();
         }
 
         private static IEnumerable<ISymbol> TryGetSymbol(
