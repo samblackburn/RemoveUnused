@@ -102,12 +102,23 @@ namespace RemoveUnused
             }
 
             var solution = await ws.OpenSolutionAsync(sln);
-            foreach (var project in solution.Projects)
+            foreach (var projectId in solution.ProjectIds)
             {
-                foreach (var document in project.Documents)
+                var project = solution.GetProject(projectId);
+                Console.WriteLine($"{project.Name}");
+                foreach (var documentId in project.DocumentIds)
                 {
-                    Console.WriteLine(project.Name + "\t\t\t" + document.Name);
+                    var document = project.GetDocument(documentId);
+
+                    Console.WriteLine($"{project.Name}\t{document.Name}");
+
+                    if (document.SourceCodeKind != SourceCodeKind.Regular)
+                        continue;
+
+                    project = document.Project;
                 }
+
+                solution = project.Solution;
             }
         }
 
@@ -116,8 +127,16 @@ namespace RemoveUnused
         {
             var sln = @"E:\repos\SQLCompareEngine\SQLCompare.sln";
 
-            var msWorkspace = MSBuildWorkspace.Create();
-            var solution = await msWorkspace.OpenSolutionAsync(sln);
+            MSBuildWorkspace ws;
+            try
+            {
+                ws = MSBuildWorkspace.Create();
+            }
+            catch (ReflectionTypeLoadException ex)
+            {
+                throw ex.LoaderExceptions.First();
+            }
+            var solution = await ws.OpenSolutionAsync(sln);
 
             foreach (var projectId in solution.ProjectIds)
             {
@@ -138,7 +157,7 @@ namespace RemoveUnused
                 solution = project.Solution;
             }
 
-            msWorkspace.TryApplyChanges(solution);
+            ws.TryApplyChanges(solution);
         }
 
         private async Task<Document> Rewrite(Document doc)
