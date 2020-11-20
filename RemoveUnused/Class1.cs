@@ -122,8 +122,13 @@ namespace RemoveUnused
             }
         }
 
+        public static void Main()
+        {
+            new Class1().RealSolution2();
+        }
+
         [Test]
-        public async Task RealSolution2()
+        public void RealSolution2()
         {
             var sln = @"E:\repos\SQLCompareEngine\SQLCompare.sln";
 
@@ -134,9 +139,10 @@ namespace RemoveUnused
             }
             catch (ReflectionTypeLoadException ex)
             {
+                Console.WriteLine(ex.StackTrace);
                 throw ex.LoaderExceptions.First();
             }
-            var solution = await ws.OpenSolutionAsync(sln);
+            var solution = ws.OpenSolutionAsync(sln).Result;
 
             foreach (var projectId in solution.ProjectIds)
             {
@@ -149,7 +155,7 @@ namespace RemoveUnused
                         continue;
 
                     var doc = document;
-                    doc = await Rewrite(doc);
+                    doc = Rewrite(doc);
 
                     project = doc.Project;
                 }
@@ -160,7 +166,7 @@ namespace RemoveUnused
             ws.TryApplyChanges(solution);
         }
 
-        private async Task<Document> Rewrite(Document doc)
+        private Document Rewrite(Document doc)
         {
             throw new System.NotImplementedException();
         }
