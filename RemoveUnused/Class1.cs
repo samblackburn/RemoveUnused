@@ -106,20 +106,26 @@ namespace RemoveUnused
             var ws = MakeWorkspace();
 
             var solution = await ws.OpenSolutionAsync(sln);
+            foreach (var document in GetDocuments(solution))
+            {
+                Console.WriteLine(document.Name);
+            }
+        }
+
+        private static IEnumerable<Document> GetDocuments(Solution solution)
+        {
             foreach (var projectId in solution.ProjectIds)
             {
                 var project = solution.GetProject(projectId);
-                Console.WriteLine($"{project.Name}");
                 foreach (var documentId in project.DocumentIds)
                 {
                     var document = project.GetDocument(documentId);
-
-                    Console.WriteLine($"{project.Name}\t{document.Name}");
 
                     if (document.SourceCodeKind != SourceCodeKind.Regular)
                         continue;
 
                     project = document.Project;
+                    yield return document;
                 }
 
                 solution = project.Solution;
@@ -128,21 +134,44 @@ namespace RemoveUnused
 
         public static void Main()
         {
-            new Class1().RealSolution2();
+            
         }
 
-        /// <summary>
-        /// Currently throws NotImplemented.
-        /// </summary>
         [Test]
-        public void RealSolution2()
+        public void ListCallsInRealSolution()
         {
             var sln = @"E:\repos\SQLCompareEngine\SQLCompare.sln";
 
             var ws = MakeWorkspace();
             var solution = ws.OpenSolutionAsync(sln).Result;
 
-            foreach (var projectId in solution.ProjectIds)
+            Console.WriteLine($"{DateTime.Now} Listing documents...");
+            var documents = GetDocuments(solution).ToList();
+            Console.WriteLine($"{DateTime.Now} There are {documents.Count} documents.  Generating semantic models...");
+            var models = documents.Select(d => d.GetSemanticModelAsync().Result).ToList();
+            Console.WriteLine($"{DateTime.Now} There are {models.Count} semantic models.  Generating method invocations...");
+            //Get the syntax nodes for all method invocations
+            var methodInvocations = documents.SelectMany(d => d.GetSyntaxRootAsync().Result.DescendantNodes().OfType<InvocationExpressionSyntax>()).ToList();
+            Console.WriteLine($"{DateTime.Now} There are {methodInvocations.Count} method invocations.  Generating symbols...");
+            var methodSymbols = models.SelectMany(m => methodInvocations.SelectMany(i => TryGetSymbol(i, m))).ToList();
+            Console.WriteLine($"{DateTime.Now} There are {methodSymbols.Count} symbols.  Generating references to each method...");
+            //Finds all references to each method
+            var references = methodSymbols.Select(m => new
+            {
+                Referenced = m.Locations,
+                Referencing = documents
+                    .SelectMany(d => SymbolFinder.FindReferencesAsync(m, d.Project.Solution).Result)
+                    .SelectMany(x => x.Locations)
+                    .Select(x => x.Location)
+            }).ToList();
+            Console.WriteLine($"{DateTime.Now} There are {references.Count} references.  Listing the first 10...");
+
+            foreach (var reference in references.Take(10))
+            {
+                Console.WriteLine($"    {reference.Referenced.First()} --> {reference.Referencing.First()}");
+            }
+
+            /*foreach (var projectId in solution.ProjectIds)
             {
                 var project = solution.GetProject(projectId);
                 foreach (var documentId in project.DocumentIds)
@@ -161,7 +190,7 @@ namespace RemoveUnused
                 solution = project.Solution;
             }
 
-            ws.TryApplyChanges(solution);
+            ws.TryApplyChanges(solution);*/
         }
 
         private static MSBuildWorkspace MakeWorkspace()
