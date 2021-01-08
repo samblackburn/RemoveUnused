@@ -15,8 +15,14 @@ namespace RemoveUnused
     [TestFixture]
     public class Class1
     {
+        /// <summary>
+        /// Prints "SourceFile(NewDoc[68..76)) --> SourceFile(NewDoc[44..52))"
+        /// </summary>
+        /// <details>
+        /// This test successfully identifies the relationship between a method call and the method being called.
+        /// </details>
         [Test]
-        public void Foo()
+        public void OneProject()
         {
             var cs = @"public class MyClass{public void Consumer(){Consumed();}public void Consumed(){}}";
             //                                          33 -- 41   44 -- 52                68 -- 76
@@ -48,6 +54,12 @@ namespace RemoveUnused
             }
         }
 
+        /// <summary>
+        /// Prints "SourceFile(Referenced[41..49)) --> SourceFile(Referencing[54..62))"
+        /// </summary>
+        /// <details>
+        /// This test successfully identifies the relationship between a method call and the method being called, across a csproj boundary.
+        /// </details>
         [Test]
         public async Task TwoProjects()
         {
@@ -87,7 +99,7 @@ namespace RemoveUnused
         }
 
         [Test]
-        public async Task RealSolution()
+        public async Task ListDocumentsInRealSolution()
         {
             var sln = @"E:\repos\SQLCompareEngine\SQLCompare.sln";
 
@@ -127,6 +139,9 @@ namespace RemoveUnused
             new Class1().RealSolution2();
         }
 
+        /// <summary>
+        /// Currently throws NotImplemented.
+        /// </summary>
         [Test]
         public void RealSolution2()
         {
