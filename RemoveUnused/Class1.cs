@@ -103,15 +103,7 @@ namespace RemoveUnused
         {
             var sln = @"E:\repos\SQLCompareEngine\SQLCompare.sln";
 
-            MSBuildWorkspace ws;
-            try
-            {
-                ws = MSBuildWorkspace.Create();
-            }
-            catch (ReflectionTypeLoadException ex)
-            {
-                throw ex.LoaderExceptions.First();
-            }
+            var ws = MakeWorkspace();
 
             var solution = await ws.OpenSolutionAsync(sln);
             foreach (var projectId in solution.ProjectIds)
@@ -147,16 +139,7 @@ namespace RemoveUnused
         {
             var sln = @"E:\repos\SQLCompareEngine\SQLCompare.sln";
 
-            MSBuildWorkspace ws;
-            try
-            {
-                ws = MSBuildWorkspace.Create();
-            }
-            catch (ReflectionTypeLoadException ex)
-            {
-                Console.WriteLine(ex.StackTrace);
-                throw ex.LoaderExceptions.First();
-            }
+            var ws = MakeWorkspace();
             var solution = ws.OpenSolutionAsync(sln).Result;
 
             foreach (var projectId in solution.ProjectIds)
@@ -181,9 +164,25 @@ namespace RemoveUnused
             ws.TryApplyChanges(solution);
         }
 
+        private static MSBuildWorkspace MakeWorkspace()
+        {
+            MSBuildWorkspace ws;
+            try
+            {
+                ws = MSBuildWorkspace.Create();
+            }
+            catch (ReflectionTypeLoadException ex)
+            {
+                Console.WriteLine(ex.StackTrace);
+                throw ex.LoaderExceptions.First();
+            }
+
+            return ws;
+        }
+
         private Document Rewrite(Document doc)
         {
-            throw new System.NotImplementedException();
+            return doc;
         }
 
         private static IEnumerable<ISymbol> TryGetSymbol(
