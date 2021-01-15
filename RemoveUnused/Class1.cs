@@ -139,38 +139,32 @@ namespace RemoveUnused
         }
 
         [Test]
-        public void ListCallsInRealSolution()
+        public async Task ListCallsInRealSolution()
         {
             var sln = @"E:\repos\SQLCompareEngine\SQLCompare.sln";
 
             var ws = MakeWorkspace();
-            var solution = ws.OpenSolutionAsync(sln).Result;
+            var solution = await ws.OpenSolutionAsync(sln);
 
             Console.WriteLine($"{DateTime.Now} Listing documents...");
             var documents = GetDocuments(solution).ToList();
-            Console.WriteLine($"{DateTime.Now} There are {documents.Count} documents.  Generating semantic models...");
-            var models = documents.Select(d => d.GetSemanticModelAsync().Result).ToList();
-            Console.WriteLine($"{DateTime.Now} There are {models.Count} semantic models.  Generating method invocations...");
+
+            Console.WriteLine($"{DateTime.Now} There are {documents.Count} documents.  Generating method invocations...");
             //Get the syntax nodes for all method invocations
-            var methodInvocations = documents.SelectMany(
-                    d => d.GetSyntaxRootAsync().Result.DescendantNodes().OfType<MethodDeclarationSyntax>()
-                        .Select(m => d.GetSemanticModelAsync().Result.GetDeclaredSymbol(m)))
-                .Where(m => m != null).ToList();
+            var methodInvocations = documents.SelectMany(doc => doc
+                    .GetSyntaxRootAsync().Result
+                    .DescendantNodes().OfType<InvocationExpressionSyntax>()
+                    .Select(invocation => new
+                    {
+                        invocation,
+                        doc.GetSemanticModelAsync().Result.GetSymbolInfo(invocation).Symbol
+                    }))
+                .Where(x => x != null).ToList();
 
-            Console.WriteLine($"{DateTime.Now} There are {methodInvocations.Count} method invocations.  Finding references...");
-            //Finds all references to each method
-            var references = methodInvocations.Select(m => new
+            Console.WriteLine($"{DateTime.Now} There are {methodInvocations.Count} invocations.  Listing the first 10...");
+            foreach (var reference in methodInvocations.Take(10))
             {
-                Referenced = m,
-                Referencing = SymbolFinder.FindReferencesAsync(m, solution).Result
-                    .SelectMany(x => x.Locations)
-                    .Select(x => x.Location)
-            }).ToList();
-            Console.WriteLine($"{DateTime.Now} There are {references.Count} references.  Listing the first 10...");
-
-            foreach (var reference in references.Take(10))
-            {
-                Console.WriteLine($"    {reference.Referenced?.Name} --> {reference.Referencing.FirstOrDefault()?.SourceTree?.GetText()}");
+                Console.WriteLine($"    {reference.invocation.Parent} --> {reference.Symbol?.ContainingSymbol.Name}.{reference.Symbol?.Name}");
             }
         }
 
