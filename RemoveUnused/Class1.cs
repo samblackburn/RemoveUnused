@@ -4,6 +4,7 @@ using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.FindSymbols;
 using Microsoft.CodeAnalysis.MSBuild;
@@ -151,16 +152,17 @@ namespace RemoveUnused
             var models = documents.Select(d => d.GetSemanticModelAsync().Result).ToList();
             Console.WriteLine($"{DateTime.Now} There are {models.Count} semantic models.  Generating method invocations...");
             //Get the syntax nodes for all method invocations
-            var methodInvocations = documents.SelectMany(d => d.GetSyntaxRootAsync().Result.DescendantNodes().OfType<InvocationExpressionSyntax>()).ToList();
-            Console.WriteLine($"{DateTime.Now} There are {methodInvocations.Count} method invocations.  Generating symbols...");
-            var methodSymbols = models.SelectMany(m => methodInvocations.SelectMany(i => TryGetSymbol(i, m))).ToList();
-            Console.WriteLine($"{DateTime.Now} There are {methodSymbols.Count} symbols.  Generating references to each method...");
+            var methodInvocations = documents.SelectMany(
+                    d => d.GetSyntaxRootAsync().Result.DescendantNodes().OfType<MethodDeclarationSyntax>()
+                        .Select(m => d.GetSemanticModelAsync().Result.GetDeclaredSymbol(m)))
+                .Where(m => m != null).ToList();
+
+            Console.WriteLine($"{DateTime.Now} There are {methodInvocations.Count} method invocations.  Finding references...");
             //Finds all references to each method
-            var references = methodSymbols.Select(m => new
+            var references = methodInvocations.Select(m => new
             {
-                Referenced = m.Locations,
-                Referencing = documents
-                    .SelectMany(d => SymbolFinder.FindReferencesAsync(m, d.Project.Solution).Result)
+                Referenced = m,
+                Referencing = SymbolFinder.FindReferencesAsync(m, solution).Result
                     .SelectMany(x => x.Locations)
                     .Select(x => x.Location)
             }).ToList();
@@ -168,29 +170,8 @@ namespace RemoveUnused
 
             foreach (var reference in references.Take(10))
             {
-                Console.WriteLine($"    {reference.Referenced.First()} --> {reference.Referencing.First()}");
+                Console.WriteLine($"    {reference.Referenced?.Name} --> {reference.Referencing.FirstOrDefault()?.SourceTree?.GetText()}");
             }
-
-            /*foreach (var projectId in solution.ProjectIds)
-            {
-                var project = solution.GetProject(projectId);
-                foreach (var documentId in project.DocumentIds)
-                {
-                    var document = project.GetDocument(documentId);
-
-                    if (document.SourceCodeKind != SourceCodeKind.Regular)
-                        continue;
-
-                    var doc = document;
-                    doc = Rewrite(doc);
-
-                    project = doc.Project;
-                }
-
-                solution = project.Solution;
-            }
-
-            ws.TryApplyChanges(solution);*/
         }
 
         private static MSBuildWorkspace MakeWorkspace()
@@ -221,7 +202,7 @@ namespace RemoveUnused
             ISymbol result;
             try
             {
-                result = semanticModel.GetSymbolInfo(invocationExpressionSyntax).Symbol;
+                result = ModelExtensions.GetSymbolInfo(semanticModel, invocationExpressionSyntax).Symbol;
             }
             catch
             {
