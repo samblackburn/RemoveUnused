@@ -168,6 +168,39 @@ namespace RemoveUnused
             }
         }
 
+        [Test]
+        public async Task ListUnusedMethodsRealSolution()
+        {
+            var sln = @"E:\repos\SQLCompareEngine\SQLCompare.sln";
+
+            var ws = MakeWorkspace();
+            var solution = await ws.OpenSolutionAsync(sln);
+
+            Console.WriteLine($"{DateTime.Now} Hi.");
+            var documents = GetDocuments(solution).ToList();
+
+            Console.WriteLine($"{DateTime.Now} There are {documents.Count} documents.");
+            var methodsUsed = documents.SelectMany(doc => doc
+                    .GetSyntaxRootAsync().Result
+                    .DescendantNodes().OfType<InvocationExpressionSyntax>()
+                    .Select(invocation => doc.GetSemanticModelAsync().Result.GetSymbolInfo(invocation).Symbol))
+                .Where(x => x != null).ToList();
+
+            Console.WriteLine($"{DateTime.Now} There are {methodsUsed.Count} invocations.");
+            var allMethods = documents.SelectMany(d => d
+                .GetSyntaxRootAsync().Result
+                .DescendantNodes().OfType<MethodDeclarationSyntax>()
+                .Select(method => d.GetSemanticModelAsync().Result.GetDeclaredSymbol(method))
+                ).ToList();
+            Console.WriteLine($"{DateTime.Now} There are {allMethods.Count} methods.");
+            var unusedMethods = allMethods.Except(methodsUsed, SymbolEqualityComparer.Default).ToList();
+            Console.WriteLine($"{DateTime.Now} There are {unusedMethods.Count} unused methods. First 10:");
+            foreach (var unused in unusedMethods.Take(10))
+            {
+                Console.WriteLine($"    {unused.ContainingType.Name}.{unused.Name}");
+            }
+        }
+
         private static MSBuildWorkspace MakeWorkspace()
         {
             MSBuildWorkspace ws;
