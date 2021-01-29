@@ -180,7 +180,7 @@ namespace RemoveUnused
             var documents = GetDocuments(solution).ToList();
             Console.WriteLine($"{DateTime.Now} There are {documents.Count} documents.");
 
-            var allMethods = documents.SelectMany(d => d
+            var allMethods = documents.Where(d => d.Project.Name == "SQLCompareEngine(net472)").SelectMany(d => d
                 .GetSyntaxRootAsync().Result
                 .DescendantNodes().OfType<MethodDeclarationSyntax>()
                 .Select(method => d.GetSemanticModelAsync().Result.GetDeclaredSymbol(method))
