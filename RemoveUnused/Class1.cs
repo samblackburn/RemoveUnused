@@ -177,29 +177,49 @@ namespace RemoveUnused
             var solution = await ws.OpenSolutionAsync(sln);
             Console.WriteLine($"{DateTime.Now} Hi.");
 
-            var documents = GetDocuments(solution).ToList();
+            var documents = GetDocuments(solution)
+                .Where(d => d.Name.Contains("CustomDeploymentScriptStatementTests") ||
+                                    d.Name.Contains("DeploymentScriptStatementFactory"))
+                .ToList();
             Console.WriteLine($"{DateTime.Now} There are {documents.Count} documents.");
+            foreach (var document in documents)
+            {
+                Console.WriteLine($"    {document.Name}");
+            }
 
             var allMethods = documents.Where(d => d.Project.Name == "SQLCompareEngine(net472)").SelectMany(d => d
                 .GetSyntaxRootAsync().Result
                 .DescendantNodes().OfType<MethodDeclarationSyntax>()
                 .Select(method => d.GetSemanticModelAsync().Result.GetDeclaredSymbol(method))
                 ).ToList();
-            Console.WriteLine($"{DateTime.Now} There are {allMethods.Count} methods.");
+            Console.WriteLine($"{DateTime.Now} There are {allMethods.Count} methods:");
+            foreach (var method in allMethods)
+            {
+                Console.WriteLine($"    {method.Name}");
+            }
 
             var methodsUsed = documents.SelectMany(doc => doc
                     .GetSyntaxRootAsync().Result
                     .DescendantNodes().OfType<InvocationExpressionSyntax>()
-                    .Select(invocation => doc.GetSemanticModelAsync().Result.GetSymbolInfo(invocation).Symbol))
-                .Where(x => x != null).ToList();
+                    .Select(invocation => new {Consumer = invocation, Consumed = doc.GetSemanticModelAsync().Result.GetSymbolInfo(invocation).Symbol}))
+                /*.Where(x => x != null)*/.ToList();
             Console.WriteLine($"{DateTime.Now} There are {methodsUsed.Count} invocations.");
+            foreach (var method in methodsUsed)
+            {
+                Console.WriteLine($"    {RemoveWhitespace(method.Consumer)} => {method.Consumed?.ContainingType.Name}.{method.Consumed?.Name}");
+            }
 
-            var unusedMethods = allMethods.Except(methodsUsed, SymbolEqualityComparer.Default).ToList();
+            var unusedMethods = allMethods.Except(methodsUsed.Select(m => m.Consumed), SymbolEqualityComparer.Default).ToList();
             Console.WriteLine($"{DateTime.Now} There are {unusedMethods.Count} unused methods. First 10:");
             foreach (var unused in unusedMethods.Take(10))
             {
                 Console.WriteLine($"    {unused.ContainingType.Name}.{unused.Name}");
             }
+        }
+
+        private string RemoveWhitespace(InvocationExpressionSyntax blah)
+        {
+            return blah.ToString().Replace(" ", "").Replace("\r", "").Replace("\n", "");
         }
 
         private static MSBuildWorkspace MakeWorkspace()
