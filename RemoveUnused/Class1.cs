@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
@@ -27,16 +28,7 @@ namespace RemoveUnused
         {
             var cs = @"public class MyClass{public void Consumer(){Consumed();}public void Consumed(){}}";
             //                                          33 -- 41   44 -- 52                68 -- 76
-            var mscorlib = MetadataReference.CreateFromFile(typeof(object).Assembly.Location);
-            var ws = new AdhocWorkspace();
-            //Create new project
-            var project = ws.AddProject("Sample", "C#");
-            project = project.AddMetadataReference(mscorlib);
-            //Add project to workspace
-            ws.TryApplyChanges(project.Solution);
-            var sourceText = SourceText.From(cs);
-            //Create new document
-            var doc = ws.AddDocument(project.Id, "NewDoc", sourceText);
+            var doc = MakeDocumentFromString(cs);
             //Get the semantic model
             var model = doc.GetSemanticModelAsync().Result;
             //Get the syntax nodes for all method invocations
@@ -215,6 +207,53 @@ namespace RemoveUnused
             {
                 Console.WriteLine($"    {unused.ContainingType.Name}.{unused.Name}");
             }
+        }
+
+        [Test]
+        public void RemoveArbitraryMethod()
+        {
+            var cs = @"public class MyClass
+{
+    /// <summary>sdfg</summary>
+    public void Consumer ()
+    {
+         Consumed();
+    }
+    /// <blah>
+    public void Consumed() {}
+}";
+            var document = MakeDocumentFromString(cs);
+            var root = document.GetSyntaxRootAsync().Result;
+            var nodes = root.DescendantNodes();
+
+            // In the real implementation, the start/end will come from the R# report XML
+            var methodToRemove = "Consumer";
+            var start = cs.IndexOf(methodToRemove);
+            var end = start + methodToRemove.Length;
+            Assert.Positive(start);
+
+            var found = nodes.Last(n => n.Span.Start < start && n.Span.End > end);
+            Assert.That(found, Is.InstanceOf<MethodDeclarationSyntax>());
+            Console.WriteLine($"Removing {found.Span.Start}-{found.Span.End} {found}");
+            Console.WriteLine("-------------------");
+
+            root = root.ReplaceNode(found, new List<SyntaxNode>());
+            Console.WriteLine("Modified doc:");
+            Console.WriteLine(root.ToString());
+        }
+
+        private static Document MakeDocumentFromString(string cs)
+        {
+            var mscorlib = MetadataReference.CreateFromFile(typeof(object).Assembly.Location);
+            var ws = new AdhocWorkspace();
+            //Create new project
+            var project = ws.AddProject("Sample", "C#");
+            project = project.AddMetadataReference(mscorlib);
+            //Add project to workspace
+            ws.TryApplyChanges(project.Solution);
+            var sourceText = SourceText.From(cs);
+            //Create new document
+            return ws.AddDocument(project.Id, "NewDoc", sourceText);
         }
 
         private string RemoveWhitespace(InvocationExpressionSyntax blah)
