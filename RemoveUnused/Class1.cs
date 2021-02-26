@@ -277,11 +277,6 @@ namespace RemoveUnused
             return ws;
         }
 
-        private Document Rewrite(Document doc)
-        {
-            return doc;
-        }
-
         private static IEnumerable<ISymbol> TryGetSymbol(
             ExpressionSyntax invocationExpressionSyntax,
             SemanticModel semanticModel)
