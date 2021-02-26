@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
@@ -15,7 +14,7 @@ using NUnit.Framework;
 namespace RemoveUnused
 {
     [TestFixture]
-    public class Class1
+    public class CSharpParsing
     {
         /// <summary>
         /// Prints "SourceFile(NewDoc[68..76)) --> SourceFile(NewDoc[44..52))"
