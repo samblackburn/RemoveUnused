@@ -26,15 +26,23 @@ namespace RemoveUnused
     /// <blah>
     public void Consumed() {}
 }";
-            var document = MakeDocumentFromString(cs);
-            var root = document.GetSyntaxRootAsync().Result;
-            var nodes = root.DescendantNodes();
-
             // In the real implementation, the start/end will come from the R# report XML
             var methodToRemove = "Consumer";
             var start = cs.IndexOf(methodToRemove);
             var end = start + methodToRemove.Length;
             Assert.Positive(start);
+
+            var modified = RemoveMethodWhoseNameIsAtPosition(cs, start, end);
+            Console.WriteLine("Modified doc:");
+            Console.WriteLine(modified);
+        }
+
+        private static string RemoveMethodWhoseNameIsAtPosition(string cs, int start, int end)
+        {
+            var document = MakeDocumentFromString(cs);
+            var root = document.GetSyntaxRootAsync().Result;
+            var nodes = root.DescendantNodes();
+
 
             var found = nodes.Last(n => n.Span.Start < start && n.Span.End > end);
             Assert.That(found, Is.InstanceOf<MethodDeclarationSyntax>());
@@ -42,8 +50,7 @@ namespace RemoveUnused
             Console.WriteLine("-------------------");
 
             root = root.ReplaceNode(found, new List<SyntaxNode>());
-            Console.WriteLine("Modified doc:");
-            Console.WriteLine(root.ToString());
+            return root.ToString();
         }
 
         private static Document MakeDocumentFromString(string cs)
