@@ -5,7 +5,7 @@ using System.Xml.Linq;
 
 namespace RemoveUnused
 {
-    internal class Issue
+    public class Issue
     {
         public Issue(string typeId, string file, int start, int end, int line, string message)
         {
