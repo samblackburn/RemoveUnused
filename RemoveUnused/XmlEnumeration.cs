@@ -1,6 +1,4 @@
-﻿using System.Collections.Generic;
-using System.Linq;
-using System.Xml.Linq;
+﻿using System.Linq;
 using NUnit.Framework;
 
 namespace RemoveUnused
@@ -19,31 +17,14 @@ namespace RemoveUnused
     </Project>
   </Issues>
 </Report>";
-            var issues = ParseReSharperReport(xml);
-            var issue = issues.Single();
+            var issue = Issue.ParseReSharperReportText(xml, @"E:\Work\SQLCompareEngine\").Single();
             Assert.NotNull(issue);
             Assert.AreEqual("UnusedMember.Local", issue.TypeId);
-            Assert.AreEqual("Engine\\SQLCompareEngine\\Engine\\Comparison\\Difference.cs", issue.File);
-            Assert.AreEqual(8859, issue.From);
-            Assert.AreEqual(8877, issue.To);
+            Assert.AreEqual(@"E:\Work\SQLCompareEngine\Engine\SQLCompareEngine\Engine\Comparison\Difference.cs", issue.File);
+            Assert.AreEqual(8859, issue.Start);
+            Assert.AreEqual(8877, issue.End);
             Assert.AreEqual(259, issue.Line);
             Assert.AreEqual("Enum member 'MustRebuildTo1Mask' is never used", issue.Message);
-        }
-
-        private static IEnumerable<Issue> ParseReSharperReport(string xml)
-        {
-            var doc = XDocument.Parse(xml);
-            var issues = doc.Elements("Report")?.Elements("Issues")?.Elements("Project").Elements("Issue")
-                .Select(e => new Issue
-                {
-                    TypeId = e.Attribute("TypeId")?.Value,
-                    File = e.Attribute("File")?.Value,
-                    From = int.Parse(e.Attribute("Offset").Value.Split('-')[0]),
-                    To = int.Parse(e.Attribute("Offset").Value.Split('-')[1]),
-                    Line = int.Parse(e.Attribute("Line")?.Value),
-                    Message = e.Attribute("Message")?.Value
-                });
-            return issues.ToArray();
         }
     }
 }
