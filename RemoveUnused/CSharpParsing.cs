@@ -44,8 +44,14 @@ namespace RemoveUnused
             var nodes = root.DescendantNodes();
 
 
-            var found = nodes.Last(n => n.Span.Start < start && n.Span.End > end);
-            Assert.That(found, Is.InstanceOf<MethodDeclarationSyntax>());
+            var found = nodes.LastOrDefault(n => n.Span.Start < start && n.Span.End > end);
+
+            if (!(found is MethodDeclarationSyntax))
+            {
+                Console.WriteLine("Confused. Did R# do something weird here?");
+                return cs;
+            }
+
             Console.WriteLine($"Removing {found.Span.Start}-{found.Span.End} {found}");
             Console.WriteLine("-------------------");
 
